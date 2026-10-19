@@ -59,6 +59,15 @@ class GlslOut {
 	var outIndex : Int = 0;
 	public var varNames : Map<Int,String>;
 	public var glES : Null<Float>;
+	/**
+		Default float precision of generated fragment shaders. Fragment shaders get
+		`precision mediump float`, which is FP16 on many mobile GPUs. Compile with
+		`-D pf_highp`, or set this before the first shader is generated, to get
+		`precision highp float` when mediump causes banding or precision artifacts.
+		Vertex shaders always use highp.
+	**/
+	public static var FRAGMENT_HIGHP = #if pf_highp true #else false #end;
+
 	public var version : Null<Int>;
 
 	/*
@@ -668,7 +677,7 @@ class GlslOut {
 		var f = s.funs[0];
 		isVertex = f.kind == Vertex;
 
-		if (isVertex)
+		if (isVertex || FRAGMENT_HIGHP)
 			decl("precision highp float;");
 		else
 			decl("precision mediump float;");
