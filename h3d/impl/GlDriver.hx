@@ -216,7 +216,8 @@ class GlDriver extends Driver {
 		// setup shader optim
 		hxsl.SharedShader.UNROLL_LOOPS = !hasFeature(ShaderModel3);
 		#else
-		gl.enable(GL.TEXTURE_CUBE_MAP_SEAMLESS);
+		// seamless cube map filtering is always on (and the enum invalid) in OpenGL ES 3
+		if( glES == null ) gl.enable(GL.TEXTURE_CUBE_MAP_SEAMLESS);
 		gl.finish(); // prevent glError() on first bufferData
 		#end
 		gl.pixelStorei(GL.PACK_ALIGNMENT, 1);
@@ -813,7 +814,9 @@ class GlDriver extends Driver {
 		case GL.RGBA32F, GL.RGBA16F: GL.RGBA;
 		#if !js
 		case GL.SRGB_ALPHA, GL.SRGB8_ALPHA: GL.RGBA;
-		case GL.RGBA8: GL.BGRA;
+		// OpenGL ES 3 has no BGRA pixel transfer format: BGRA textures are
+		// stored and transferred as RGBA there (see uploadTexturePixels).
+		case GL.RGBA8: glES != null ? GL.RGBA : GL.BGRA;
 		#end
 		case GL.SRGB, GL.SRGB8: GL.RGB;
 		case GL.RGBA: GL.RGBA;
@@ -1168,7 +1171,12 @@ class GlDriver extends Driver {
 		var face = cubic ? CUBE_FACES[side] : t.flags.has(IsArray) ? GL.TEXTURE_2D_ARRAY : GL.TEXTURE_2D;
 		var bind = getBindType(t);
 		gl.bindTexture(bind, t.t.t);
+		#if !js
+		// GLES3: BGRA data is uploaded as RGBA (getChannels), so swap channels on the CPU
+		pixels.convert(glES != null && t.format == BGRA ? RGBA : t.format);
+		#else
 		pixels.convert(t.format);
+		#end
 		pixels.setFlip(false);
 		var dataLen = pixels.dataSize;
 		// S3TC needs this
@@ -1729,7 +1737,7 @@ class GlDriver extends Driver {
 		gl.readPixels(x, y, pixels.width, pixels.height, getChannels(curTarget.t), curTarget.t.pixelFmt, buffer);
 		var error = gl.getError();
 		if( error != 0 ) throw "Failed to capture pixels (error "+error+")";
-		@:privateAccess pixels.innerFormat = curTarget.format;
+		@:privateAccess pixels.innerFormat = #if hl (glES != null && curTarget.format == BGRA) ? RGBA : #end curTarget.format;
 		#end
 	}
 
